@@ -34,8 +34,7 @@ VkMemoryBarrier kMemoryBarrierForAll = {
         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-        VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT |
-        VK_ACCESS_HOST_READ_BIT | VK_ACCESS_HOST_WRITE_BIT,
+        VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
     VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_INDEX_READ_BIT |
         VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT |
         VK_ACCESS_INPUT_ATTACHMENT_READ_BIT | VK_ACCESS_SHADER_READ_BIT |
@@ -43,8 +42,7 @@ VkMemoryBarrier kMemoryBarrierForAll = {
         VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-        VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT |
-        VK_ACCESS_HOST_READ_BIT | VK_ACCESS_HOST_WRITE_BIT};
+        VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT};
 
 }  // namespace
 
@@ -54,8 +52,9 @@ Resource::Resource(Device* device, uint32_t size_in_bytes)
 Resource::~Resource() = default;
 
 Result Resource::CreateVkBuffer(VkBuffer* buffer, VkBufferUsageFlags usage) {
-  if (!buffer)
+  if (!buffer) {
     return Result("Vulkan::Given VkBuffer pointer is nullptr");
+  }
 
   VkBufferCreateInfo buffer_info = VkBufferCreateInfo();
   buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -83,19 +82,22 @@ uint32_t Resource::ChooseMemory(uint32_t memory_type_bits,
   uint32_t memory_type_index = 0;
   while (memory_type_bits) {
     if (memory_type_bits % 2) {
-      if (first_non_zero == std::numeric_limits<uint32_t>::max())
+      if (first_non_zero == std::numeric_limits<uint32_t>::max()) {
         first_non_zero = memory_type_index;
+      }
 
-      if (device_->HasMemoryFlags(memory_type_index, flags))
+      if (device_->HasMemoryFlags(memory_type_index, flags)) {
         return memory_type_index;
+      }
     }
 
     ++memory_type_index;
     memory_type_bits >>= 1;
   }
 
-  if (require_flags_found)
+  if (require_flags_found) {
     return std::numeric_limits<uint32_t>::max();
+  }
 
   return first_non_zero;
 }
@@ -112,10 +114,12 @@ Result Resource::AllocateAndBindMemoryToVkBuffer(VkBuffer buffer,
 
   *memory_type_index = 0;
 
-  if (buffer == VK_NULL_HANDLE)
+  if (buffer == VK_NULL_HANDLE) {
     return Result("Vulkan::Given VkBuffer is VK_NULL_HANDLE");
-  if (memory == nullptr)
+  }
+  if (memory == nullptr) {
     return Result("Vulkan::Given VkDeviceMemory pointer is nullptr");
+  }
 
   VkMemoryRequirements requirement;
   device_->GetPtrs()->vkGetBufferMemoryRequirements(device_->GetVkDevice(),
@@ -123,12 +127,14 @@ Result Resource::AllocateAndBindMemoryToVkBuffer(VkBuffer buffer,
 
   *memory_type_index =
       ChooseMemory(requirement.memoryTypeBits, flags, require_flags_found);
-  if (*memory_type_index == std::numeric_limits<uint32_t>::max())
+  if (*memory_type_index == std::numeric_limits<uint32_t>::max()) {
     return Result("Vulkan::Find Proper Memory Fail");
+  }
 
   Result r = AllocateMemory(memory, requirement.size, *memory_type_index);
-  if (!r.IsSuccess())
+  if (!r.IsSuccess()) {
     return r;
+  }
 
   if (device_->GetPtrs()->vkBindBufferMemory(device_->GetVkDevice(), buffer,
                                              *memory, 0) != VK_SUCCESS) {
@@ -207,9 +213,10 @@ void Resource::MemoryBarrier(CommandBuffer* command_buffer) {
   // ReadOnly Descriptors          host w         shader r
   //                           transfer w       transfer r
   device_->GetPtrs()->vkCmdPipelineBarrier(
-      command_buffer->GetVkCommandBuffer(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1, &kMemoryBarrierForAll, 0,
-      nullptr, 0, nullptr);
+      command_buffer->GetVkCommandBuffer(),
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VK_PIPELINE_STAGE_HOST_BIT,
+      VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VK_PIPELINE_STAGE_HOST_BIT, 0, 1,
+      &kMemoryBarrierForAll, 0, nullptr, 0, nullptr);
 }
 
 }  // namespace vulkan
